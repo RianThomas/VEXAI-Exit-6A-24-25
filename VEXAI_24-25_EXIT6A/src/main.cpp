@@ -71,32 +71,51 @@ void auto_Isolation(void) {
   thread t1(dashboardTask);
 
   this_thread::sleep_for(loop_time);
-  bool hold = false;
+  
+  bool reverseable = false;
+  bool catchr = false;
+  bool rings = false;
+  int count = 0;
   while (true){
     if (jetson_comms.get_packets() > 0){
-      if (local_map.detectionCount > 0){ //Add a for loop here *********** vvvvvvvvv
-        if (local_map.detections[0].classID == 0){
-          if (local_map.detections[0].mapLocation.y >= 0.2 && !hold){
-            hold = true;
-            Drivetrain.driveFor(reverse, local_map.detections[0].mapLocation.y * 1000, mm);
-            for (double i = 5; i < 180; i += 5){
-              Drivetrain.turnFor(right, i, degrees, true);
-            }
-            wait(5, seconds); //Just put the arm down here and then continue with the rest of the program
+      if (local_map.detectionCount > 0 && !reverseable){ //Add a for loop here *********** vvvvvvvvv
+        for (int i = 0; i < local_map.detectionCount; i++){
+          if (local_map.detections[i].classID == 0 && !reverseable){ //Checks if it is a mobile goal
+                Drivetrain.driveFor(reverse, (distanceTo(local_map.detections[i].mapLocation.x * 1000, local_map.detections[i].mapLocation.y * 1000)) - 200, mm);
+                reverseable = true;
           }
         }
-        if (local_map.detections[0].classID == 1 && hold){
-          Drivetrain.driveFor(reverse, 10, inches);
-        }
-        else if (local_map.detections[0].classID == 2 && hold){
-          Drivetrain.driveFor(reverse, 10, inches);
-          Drivetrain.driveFor(forward, 10, inches);
+      }
+      else if (!reverseable && !rings){
+        Drivetrain.setTurnVelocity(10, percent);
+        Drivetrain.turnFor(left, 7, degrees, false);
+      }
+      else if (reverseable && !rings){
+        Drivetrain.turnFor(right, 1080, degrees, false);
+        rings = true;
+      }
+
+
+      //When it has a mobile goal latched onto it
+      if (rings){
+        if (local_map.detectionCount > 0){
+          for (int i = 0; i < local_map.detectionCount; i++){ //Add a for loop here *********** vvvvvvvvv
+            if (local_map.detections[i].classID == 1 && !catchr){ //Checks if it is a mobile goal
+              if (local_map.detections[i].mapLocation.y >= 0.2){ //Goes toward the goal
+                Drivetrain.driveFor(reverse, local_map.detections[i].mapLocation.y * 1000, mm);
+                catchr = true;
+              }
+              else{
+                Drivetrain.turnFor(left, 7, degrees, false);
+              }
+            }
+          }
         }
       }
-      else {
-        Drivetrain.turnFor(left, 10, degrees, false);
-      }
+
+      //Vex link to send taken data
     }
+    
     jetson_comms.get_data( &local_map );
 
       // set our location to be sent to partner robot
